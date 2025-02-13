@@ -42,9 +42,9 @@ float ComputeCurvature(float x, float y) {
 }
 
 int main(int argc, char *argv[]) {
-    int initialCount = 50;
+    int initialCount = 3;
     float mass = 250000000.0f;
-    char *arrangement = "random";
+    char *arrangement = "circle";
     if (argc >= 2) {
         initialCount = atoi(argv[1]);
         if (initialCount < 1) initialCount = 50;
@@ -62,7 +62,9 @@ int main(int argc, char *argv[]) {
     InitWindow(screenWidth, screenHeight, "N-Body Simulation");
     SetTargetFPS(60);
 
+
     if (strcmp(arrangement, "circle") == 0) {
+        funny: ;
         Vector2 center = { screenWidth / 2.0f, screenHeight / 2.0f };
         float radius = (screenWidth < screenHeight ? screenWidth : screenHeight) / 3.0f;
         for (int i = 0; i < initialCount; i++) {
@@ -72,12 +74,14 @@ int main(int argc, char *argv[]) {
             Vector2 vel = { -sinf(angle) * speed, cosf(angle) * speed };
             AddParticle(pos, vel, mass);
         }
-    } else {
+    } else if (strcmp(arrangement, "random") == 0) {
         for (int i = 0; i < initialCount; i++) {
             Vector2 pos = { (float)GetRandomValue(0, screenWidth), (float)GetRandomValue(0, screenHeight) };
             Vector2 vel = { (float)GetRandomValue(-50, 50), (float)GetRandomValue(-50, 50) };
             AddParticle(pos, vel, mass);
         }
+    } else {
+        goto funny;
     }
 
     while (!WindowShouldClose()) {
