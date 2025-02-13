@@ -13,6 +13,7 @@ typedef struct Particle {
     Vector3 pos;
     Vector3 vel;
     float mass;
+    int diameter;
     Vector3 trail[MAX_TRAIL];
     int trailCount;
 } Particle;
@@ -20,11 +21,12 @@ typedef struct Particle {
 Particle particles[MAX_PARTICLES];
 int particleCount = 0;
 
-void AddParticle(Vector3 pos, Vector3 vel, float mass) {
+void AddParticle(Vector3 pos, Vector3 vel, float mass, float diameter) {
     if (particleCount < MAX_PARTICLES) {
         particles[particleCount].pos = pos;
         particles[particleCount].vel = vel;
         particles[particleCount].mass = mass;
+        particles[particleCount].diameter = diameter;
         particles[particleCount].trailCount = 0;
         particleCount++;
     }
@@ -71,6 +73,7 @@ int main(int argc, char *argv[]) {
     camera.projection = CAMERA_PERSPECTIVE;
 
     if (strcmp(arrangement, "circle") == 0) {
+    funny: ;
         Vector3 center = { 0, 0, 0 };
         float radius = simSize / 3.0f;
         float speed = 50.0f;
@@ -87,9 +90,9 @@ int main(int argc, char *argv[]) {
             if (fabsf(Vector3DotProduct(radial, up)) > 0.99f) up = (Vector3){ 1, 0, 0 };
             Vector3 tangent = Vector3Normalize(Vector3CrossProduct(radial, up));
             Vector3 vel = { tangent.x * speed, tangent.y * speed, tangent.z * speed };
-            AddParticle(pos, vel, mass);
+            AddParticle(pos, vel, mass, 2.0f);
         }
-    } else {
+    } else if (strcmp(arrangement, "random") == 0) {
         for (int i = 0; i < initialCount; i++) {
             Vector3 pos = {
                 (float)GetRandomValue(-simSize/2, simSize/2),
@@ -101,12 +104,28 @@ int main(int argc, char *argv[]) {
                 (float)GetRandomValue(-50, 50),
                 (float)GetRandomValue(-50, 50)
             };
-            AddParticle(pos, vel, mass);
+            AddParticle(pos, vel, mass, 2.0f);
         }
+    } else if (strcmp(arrangement, "solar system") == 0) {
+        // https://nssdc.gsfc.nasa.gov/planetary/factsheet/
+        // TODO: calculate initial velocities
+        //          position             velocity          mass         diameter
+        AddParticle((Vector3){0,0,0},    (Vector3){0,0,0}, 1.9891e-30f, 1.391e-6f);  // Sun
+        AddParticle((Vector3){0,0,47.4}, (Vector3){0,0,0}, 0.33e-24f,   4.879e-3f);  // Mercury
+        AddParticle((Vector3){0,0,35.0}, (Vector3){0,0,0}, 4.87e-24f,   12.104e-3f); // Venus
+        AddParticle((Vector3){0,0,29.8}, (Vector3){0,0,0}, 5.97e-24f,   12.756e-3f); // Earth
+        AddParticle((Vector3){0,0,24.1}, (Vector3){0,0,0}, 0.642e-24f,  6.792e-3f);  // Mars
+        AddParticle((Vector3){0,0,13.1}, (Vector3){0,0,0}, 1898e-24f,   142.984e-3f);// Jupiter
+        AddParticle((Vector3){0,0,9.7},  (Vector3){0,0,0}, 568e-24f,    120.536e-3f);// Saturn
+        AddParticle((Vector3){0,0,6.8},  (Vector3){0,0,0}, 86.8e-24f,   51.118e-3f); // Uranus
+        AddParticle((Vector3){0,0,5.4},  (Vector3){0,0,0}, 102e-24f,    49.528e-3f); // Neptune
+        AddParticle((Vector3){0,0,4.7},  (Vector3){0,0,0}, 0.013e-24f,  2.376e-3f);  // Pluto
+    } else {
+        goto funny;
     }
 
     while (!WindowShouldClose()) {
-        float dt = 1.0f / 60.0f;
+        float dt = (1.0f / 60.0f) * 0.5f;
         for (int i = 0; i < particleCount; i++) {
             Vector3 acceleration = { 0, 0, 0 };
             for (int j = 0; j < particleCount; j++) {
@@ -145,7 +164,7 @@ int main(int argc, char *argv[]) {
             if (particles[i].pos.z >= simSize/2 || particles[i].pos.z <= -simSize/2)
                 particles[i].vel.z *= -0.9;
         }
-#endif
+#endif // BOX
 
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
             Vector2 mousePos = GetMousePosition();
@@ -157,36 +176,64 @@ int main(int argc, char *argv[]) {
                 (float)GetRandomValue(-50, 50),
                 (float)GetRandomValue(-50, 50)
             };
-            AddParticle(newPos, vel, mass);
+            AddParticle(newPos, vel, mass, 2.0f);
         }
         
         BeginDrawing();
-        ClearBackground(RAYWHITE);
+        ClearBackground(BLACK);
         BeginMode3D(camera);
 
 #ifdef GRID
         float gridSpacing = 10.0f;
         float sampleStep = 10.0f;
-        float scale = 50.0f;
+        float gridScale = 50.0f;
         for (float z = -simSize/2; z <= simSize/2; z += gridSpacing) {
-            Vector3 prev = { -simSize/2, scale * ComputeCurvature(-simSize/2, z), z };
+            Vector3 prev = { -simSize/2, gridScale * ComputeCurvature(-simSize/2, z), z };
             for (float x = -simSize/2; x <= simSize/2; x += sampleStep) {
-                float offset = scale * ComputeCurvature(x, z);
+                float offset = gridScale * ComputeCurvature(x, z);
                 Vector3 curr = { x, offset, z };
                 DrawLine3D(prev, curr, LIGHTGRAY);
                 prev = curr;
             }
         }
         for (float x = -simSize/2; x <= simSize/2; x += gridSpacing) {
-            Vector3 prev = { x, scale * ComputeCurvature(x, -simSize/2), -simSize/2 };
+            Vector3 prev = { x, gridScale * ComputeCurvature(x, -simSize/2), -simSize/2 };
             for (float z = -simSize/2; z <= simSize/2; z += sampleStep) {
-                float offset = scale * ComputeCurvature(x, z);
+                float offset = gridScale * ComputeCurvature(x, z);
                 Vector3 curr = { x, offset, z };
                 DrawLine3D(prev, curr, LIGHTGRAY);
                 prev = curr;
             }
         }
-#endif
+#endif // GRID
+#ifdef COLLISIONS
+        for (int i = 0; i < particleCount; i++) {
+            for (int j = i + 1; j < particleCount; j++) {
+                float r_i = particles[i].diameter * 0.5f;
+                float r_j = particles[j].diameter * 0.5f;
+                if (Vector3Distance(particles[i].pos, particles[j].pos) < (r_i + r_j)) {
+                    if (particles[i].mass >= particles[j].mass) {
+                        particles[i].mass += particles[j].mass * 0.5f;
+                        // Remove particle j
+                        for (int k = j; k < particleCount - 1; k++) {
+                            particles[k] = particles[k + 1];
+                        }
+                        particleCount--;
+                        j--;
+                    } else {
+                        particles[j].mass += particles[i].mass * 0.5f;
+                        // Remove particle i
+                        for (int k = i; k < particleCount - 1; k++) {
+                            particles[k] = particles[k + 1];
+                        }
+                        particleCount--;
+                        i--;
+                        break;
+                    }
+                }
+            }
+        }
+#endif // COLLISONS
 
         for (int i = 0; i < particleCount; i++) {
             int count = particles[i].trailCount < MAX_TRAIL ? particles[i].trailCount : MAX_TRAIL;
@@ -195,20 +242,19 @@ int main(int argc, char *argv[]) {
                 Vector3 prev = particles[i].trail[startIndex];
                 for (int k = 1; k < count; k++) {
                     int index = (startIndex + k) % MAX_TRAIL;
-                    DrawLine3D(prev, particles[i].trail[index], RED);
+                    DrawLine3D(prev, particles[i].trail[index], LIGHTGRAY);
                     prev = particles[i].trail[index];
                 }
             }
         }
 
         for (int i = 0; i < particleCount; i++) {
-            DrawSphere(particles[i].pos, 2.0f, RED);
+            DrawSphere(particles[i].pos, (float)particles[i].diameter/2, WHITE);
         }
         EndMode3D();
         DrawFPS(10, 10);
         EndDrawing();
     }
-
     CloseWindow();
     return 0;
 }

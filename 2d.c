@@ -1,8 +1,8 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include "raylib.h"
+#include <raymath.h>
 
 #define MAX_PARTICLES 1024
 #define MAX_TRAIL 100
@@ -13,6 +13,7 @@ typedef struct Particle {
     Vector2 pos;
     Vector2 vel;
     float mass;
+    float diameter;
     Vector2 trail[MAX_TRAIL];
     int trailCount;
 } Particle;
@@ -20,11 +21,12 @@ typedef struct Particle {
 Particle particles[MAX_PARTICLES];
 int particleCount = 0;
 
-void AddParticle(Vector2 pos, Vector2 vel, float mass) {
+void AddParticle(Vector2 pos, Vector2 vel, float mass, float diameter) {
     if (particleCount < MAX_PARTICLES) {
         particles[particleCount].pos = pos;
         particles[particleCount].vel = vel;
         particles[particleCount].mass = mass;
+        particles[particleCount].diameter = diameter;
         particles[particleCount].trailCount = 0;
         particleCount++;
     }
@@ -72,20 +74,20 @@ int main(int argc, char *argv[]) {
             Vector2 pos = { center.x + cosf(angle) * radius, center.y + sinf(angle) * radius };
             float speed = 50.0f;
             Vector2 vel = { -sinf(angle) * speed, cosf(angle) * speed };
-            AddParticle(pos, vel, mass);
+            AddParticle(pos, vel, mass, 2.0f);
         }
     } else if (strcmp(arrangement, "random") == 0) {
         for (int i = 0; i < initialCount; i++) {
             Vector2 pos = { (float)GetRandomValue(0, screenWidth), (float)GetRandomValue(0, screenHeight) };
             Vector2 vel = { (float)GetRandomValue(-50, 50), (float)GetRandomValue(-50, 50) };
-            AddParticle(pos, vel, mass);
+            AddParticle(pos, vel, mass, 2.0f);
         }
     } else {
         goto funny;
     }
 
     while (!WindowShouldClose()) {
-        float dt = 1.0f / 60.0f;
+        float dt = (1.0f / 60.0f) * 0.5f;
         for (int i = 0; i < particleCount; i++) {
             Vector2 acceleration = { 0, 0 };
             for (int j = 0; j < particleCount; j++) {
@@ -124,13 +126,13 @@ int main(int argc, char *argv[]) {
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
             Vector2 mousePos = GetMousePosition();
             Vector2 vel = { (float)GetRandomValue(-50, 50), (float)GetRandomValue(-50, 50) };
-            AddParticle(mousePos, vel, mass);
+            AddParticle(mousePos, vel, mass, 2.0f);
         }
         screenWidth = GetScreenWidth();
         screenHeight = GetScreenHeight();
 
         BeginDrawing();
-        ClearBackground(WHITE);
+        ClearBackground(BLACK);
 
 #ifdef GRID        
         float gridSpacing = 20.0f;
@@ -157,6 +159,32 @@ int main(int argc, char *argv[]) {
             }
         }
 #endif // GRID
+#ifdef COLLISIONS
+        for (int i = 0; i < particleCount; i++) {
+            for (int j = i + 1; j < particleCount; j++) {
+                float r_i = particles[i].diameter * 0.5f;
+                float r_j = particles[j].diameter * 0.5f;
+                if (Vector2Distance(particles[i].pos, particles[j].pos) < (r_i + r_j)) {
+                    if (particles[i].mass >= particles[j].mass) {
+                        particles[i].mass += particles[j].mass * 0.5f;
+                        for (int k = j; k < particleCount - 1; k++) {
+                            particles[k] = particles[k + 1];
+                        }
+                        particleCount--;
+                        j--;
+                    } else {
+                        particles[j].mass += particles[i].mass * 0.5f;
+                        for (int k = i; k < particleCount - 1; k++) {
+                            particles[k] = particles[k + 1];
+                        }
+                        particleCount--;
+                        i--;
+                        break;
+                    }
+                }
+            }
+        }
+#endif // COLLISONS
 
         for (int i = 0; i < particleCount; i++) {
             int count = particles[i].trailCount < MAX_TRAIL ? particles[i].trailCount : MAX_TRAIL;
@@ -165,14 +193,14 @@ int main(int argc, char *argv[]) {
                 Vector2 prev = particles[i].trail[startIndex];
                 for (int k = 1; k < count; k++) {
                     int index = (startIndex + k) % MAX_TRAIL;
-                    DrawLineV(prev, particles[i].trail[index], RED);
+                    DrawLineV(prev, particles[i].trail[index], LIGHTGRAY);
                     prev = particles[i].trail[index];
                 }
             }
         }
 
         for (int i = 0; i < particleCount; i++) {
-            DrawCircleV(particles[i].pos, 3, RED);
+            DrawCircleV(particles[i].pos, particles[i].diameter/2, WHITE);
         }
         EndDrawing();
     }
